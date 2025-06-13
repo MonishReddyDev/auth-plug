@@ -13,3 +13,5 @@ dist/
 # OS & Editor
 .DS_Store
 .vscode/
+
+/src/generated/prisma
