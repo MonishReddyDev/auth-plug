@@ -1,7 +1,7 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
+  // output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -41,7 +41,7 @@ model User{
 }
 
 model RefreshToken{
-  id String @id
+  id String @id @default(uuid()) //Prisma will auto generate the ID
   // Secure token
   token String @unique
   
@@ -55,7 +55,7 @@ model RefreshToken{
   device String?     //e.g., iPhone 14, Samsung Galaxy
 
   //Token Lifecycle
-  isValid Boolean @default(false)
+  isValid Boolean @default(true)
   createdAt DateTime @default(now())
   expiresAt DateTime
 
