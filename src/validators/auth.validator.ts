@@ -19,6 +19,7 @@ export const registerSchema = Joi.object({
     "string.empty": "Password is required.",
     "any.required": "Password is required.",
   }),
+  role: Joi.string(),
 });
 
 export const loginSchema = Joi.object({

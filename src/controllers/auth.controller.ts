@@ -6,6 +6,10 @@ import {
   generateAccessToken,
   generateRefreshToken,
 } from "../services/token.service";
+import { generateOtp } from "../services/otp.service";
+import { sendOtpEmail } from "../services/sendEmail.service";
+import { use } from "passport";
+import { hashToken } from "../utils/hash.util";
 
 // Use environment variable for refresh token secret, fallback to a dev default
 const REFRESH_SECRET = process.env.REFRESH_SECRET || "refresh-secret";
@@ -20,7 +24,7 @@ const REFRESH_SECRET = process.env.REFRESH_SECRET || "refresh-secret";
  * - Sets refresh token in secure, HTTP-only cookie.
  */
 export const register = async (req: Request, res: Response): Promise<void> => {
-  const { email, password } = req.body;
+  const { email, password, role } = req.body;
 
   try {
     // 1. Check if user already exists
@@ -32,15 +36,23 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     // 2. Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
+    const { otp, expiresAt } = generateOtp();
+    const hashotp = hashToken(otp);
 
     // 3. Create new user in DB
     const newUser = await prisma.user.create({
       data: {
         email,
         password: hashedPassword,
+        role,
+        verifyToken: hashotp,
+        verifyTokenExpiry: expiresAt,
         // Other fields (isVerified, role, etc.) use defaults
       },
     });
+
+    // 5. Send email with OTP
+    await sendOtpEmail(email, otp);
 
     // 4. Generate access & refresh tokens
     const accessToken = generateAccessToken(newUser.id, newUser.role);
@@ -103,10 +115,24 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    if (!user.isVerified) {
+      res.status(403).json({
+        message: "Email not verified. Please verify your email to log in.",
+      });
+      return;
+    }
+
     // 2. Compare provided password with stored hash
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       res.status(401).json({ message: "Invalid email or password" });
+      return;
+    }
+    // After password is validated, add this check
+    if (!user.isVerified) {
+      res.status(403).json({
+        message: "Email not verified. Please check your inbox for the OTP.",
+      });
       return;
     }
 
@@ -219,7 +245,6 @@ export const refreshAccessToken = async (
         userAgent: req.headers["user-agent"] || "unknown",
         ipAddress: req.ip,
         expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // 7 days
-        isValid: true,
       },
     });
 
