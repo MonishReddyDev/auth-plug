@@ -1,35 +1,33 @@
 import express from "express";
 import {
-  login,
-  logout,
-  logoutAll,
-  refreshAccessToken,
-  register,
+  loginUser,
+  logoutAllHandler,
+  refreshTokenHandler,
+  registerUser,
 } from "../controllers/auth.controller";
+import { verifyOtpController } from "../controllers/email.controller";
 import { validateRequest } from "../middlewares/validateRequest";
 import { loginSchema, registerSchema } from "../validators/auth.validator";
 import { verifyToken } from "../middlewares/auth.middleware";
-import { verifyOtp } from "../controllers/verify.otp";
-import { resendOtp } from "../controllers/resendotp";
-import { forgotPassword, resetPassword } from "../controllers/forgetPassword";
+import { resendOtpController } from "../controllers/email.controller";
+import {
+  forgotPasswordController,
+  resetPasswordController,
+} from "../controllers/password.controller";
 
 const router = express.Router();
 
-router.post("/register", validateRequest(registerSchema), register);
+router.post("/register", validateRequest(registerSchema), registerUser);
+router.post("/login", validateRequest(loginSchema), loginUser);
+router.get("/refresh-token", refreshTokenHandler);
+router.post("/logout", verifyToken, logoutAllHandler);
+router.post("/logout-all", verifyToken, logoutAllHandler);
 
-router.post("/login", validateRequest(loginSchema), login);
+router.post("/verify-otp", verifyOtpController);
+router.post("/resend-otp", resendOtpController);
 
-router.get("/refresh-token", verifyToken, refreshAccessToken);
+router.post("/forgot-password", forgotPasswordController);
+router.post("/reset-password", resetPasswordController);
 
-router.post("/logout", verifyToken, logout);
-
-router.post("/logout-all", verifyToken, logoutAll);
-
-router.post("/verify-otp", verifyOtp);
-
-router.post("/resend-otp", resendOtp);
-
-router.post("/forgotPassword", forgotPassword);
-router.post("/resetPassword", resetPassword);
 
 export default router;

@@ -1,57 +1,55 @@
 import prisma from "../config/prisma";
-import { Request, Response } from "express";
-import { generateOtp } from "../services/otp.service";
+
 import { hashToken, verifyHashedToken } from "../utils/hash.util";
-import { sendOtpEmail } from "../services/sendEmail.service";
 import bcrypt from "bcryptjs";
+import { generateOtp } from "../utils/otp.utils";
+import { sendOtpEmail } from "../utils/Email.utils";
 
-export const forgotPassword = async (req: Request, res: Response) => {
-  const { email } = req.body;
-
+export const handleForgotPassword = async (email: string) => {
   const user = await prisma.user.findUnique({ where: { email } });
 
   if (!user) {
-    res.status(200).json({
+    return {
+      status: 200,
       message: "If the email is registered, an OTP has been sent.",
-    });
-    return;
+    };
   }
 
-  const { otp, expiresAt } = generateOtp(); // e.g., 6-digit
+  const { otp, expiresAt } = generateOtp();
   const hashedOTP = hashToken(otp);
 
   await prisma.user.update({
     where: { email },
     data: {
       resetToken: hashedOTP,
-      resetTokenExpiry: expiresAt, // 10 min
+      resetTokenExpiry: expiresAt,
     },
   });
 
   await sendOtpEmail(email, otp);
 
-  res.status(200).json({
+  return {
+    status: 200,
     message: "If the email is registered, an OTP has been sent.",
-  });
-  return;
+  };
 };
 
-export const resetPassword = async (req: Request, res: Response) => {
-  const { email, otp, newPassword } = req.body;
-
+export const handleResetPassword = async (
+  email: string,
+  otp: string,
+  newPassword: string
+) => {
   const user = await prisma.user.findUnique({ where: { email } });
 
   if (!user || !user.resetToken || !user.resetTokenExpiry) {
-    res.status(400).json({ message: "Invalid request" });
-    return;
+    return { status: 400, message: "Invalid request" };
   }
 
   const isExpired = user.resetTokenExpiry < new Date();
-  const isValid = verifyHashedToken(otp, user.resetToken); // compare hash
+  const isValid = verifyHashedToken(otp, user.resetToken);
 
   if (!isValid || isExpired) {
-    res.status(400).json({ message: "Invalid or expired OTP" });
-    return;
+    return { status: 400, message: "Invalid or expired OTP" };
   }
 
   const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -65,6 +63,5 @@ export const resetPassword = async (req: Request, res: Response) => {
     },
   });
 
-  res.status(200).json({ message: "Password reset successful" });
-  return;
+  return { status: 200, message: "Password reset successful" };
 };
