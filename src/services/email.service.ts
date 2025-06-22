@@ -1,7 +1,7 @@
 import prisma from "../config/prisma";
 import { generateOtp } from "../utils/otp.utils";
 import { hashToken } from "../utils/hash.util";
-import { sendOtpEmail } from "../utils/Email.utils";
+import { sendOtpEmail } from "../utils/email.utils";
 
 export const resendOtpService = async (email: string) => {
   try {
@@ -52,6 +52,7 @@ export const verifyOtpService = async (email: string, otp: string) => {
       },
     });
 
+    console.log(user);
     if (!user) {
       return { status: 400, message: "Invalid or expired OTP" };
     }

@@ -6,59 +6,58 @@ import {
   handleUserLogin,
   handleUserRegistration,
 } from "../services/auth.service";
+import { issueTokensForUser } from "../utils/jwt.utils";
+import { success, error } from "../utils/response.util";
+import { logError } from "../utils/logger.util";
+import { clearAuthCookie, setAuthCookie } from "../utils/cookie.util";
 
+// REGISTER
 export const registerUser = async (
   req: Request,
   res: Response
 ): Promise<void> => {
-  const { result, accessToken, refreshToken, user } =
-    await handleUserRegistration(req);
+  const result = await handleUserRegistration(req);
 
   if (result.status !== 201) {
-    res.status(result.status).json({ message: result.message });
+    logError(new Error(result.message), req);
+    error(res, result.message, result.status);
     return;
   }
 
-  // ✅ Set refresh token cookie exactly like you had
-  res.cookie("refreshToken", refreshToken, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "strict",
-    maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
-  });
+  // Set refresh token as cookie if needed
+  if (result.data.refreshToken) {
+    res.cookie("refreshToken", result.data.refreshToken, {
+      httpOnly: true, // JS can't access: prevents XSS
+      secure: process.env.NODE_ENV === "production", // Use true in production (HTTPS)
+      sameSite: "lax", // Strict is safest (Lax if you want, but strict is best for auth)
+      path: "/", // Applies to all routes
+      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+    });
+  }
 
-  // ✅ Match your original response format
-  res.status(201).json({
-    message: "User registered successfully",
-    accessToken,
-    user,
-  });
+  success(res, result.message, result.data, result.status);
+  return;
 };
 
+// LOGIN
 export const loginUser = async (req: Request, res: Response): Promise<void> => {
-  const { result, accessToken, refreshToken, user } = await handleUserLogin(
-    req
-  );
+  const result = await handleUserLogin(req);
 
   if (result.status !== 200) {
-    res.status(result.status).json({ message: result.message });
+    logError(new Error(result.message), req);
+    error(res, result.message, result.status);
     return;
   }
 
-  res.cookie("refreshToken", refreshToken, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "strict",
-    maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
-  });
+  if (result.data.refreshToken)
+    setAuthCookie(res, "refreshToken", result.data.refreshToken);
+  // if (result.data.accessToken)
+  //   setAuthCookie(res, "accessToken", result.data.accessToken);
 
-  res.status(200).json({
-    message: "Login successful",
-    accessToken,
-    user,
-  });
+  success(res, result.message, result.data, result.status);
 };
 
+// REFRESH TOKEN
 export const refreshTokenHandler = async (
   req: Request,
   res: Response
@@ -66,48 +65,98 @@ export const refreshTokenHandler = async (
   const result = await handleRefreshToken(req);
 
   if (result.status !== 200) {
-    res.status(result.status).json({ message: result.message });
+    error(res, result.message, result.status);
     return;
   }
 
-  res.cookie("refreshToken", result.newRefreshToken, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "strict",
-    maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
-  });
+  if (result.data.accessToken) {
+    setAuthCookie(res, "accessToken", result.data.accessToken);
+  }
+  if (result.data.refreshToken) {
+    setAuthCookie(res, "refreshToken", result.data.refreshToken);
+  }
 
-  res.status(200).json({
-    accessToken: result.accessToken,
-  });
+  success(res, result.message, result.data, result.status);
+  return;
 };
 
+// LOGOUT
 export const logoutHandler = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   const result = await handleLogout(req);
 
-  res.clearCookie("refreshToken", {
-    httpOnly: true,
-    secure: true,
-    sameSite: "strict",
-  });
+  clearAuthCookie(res, "accessToken");
+  clearAuthCookie(res, "refreshToken");
 
-  res.status(result.status).json({ message: result.message });
+  if (result.status !== 200) {
+    error(res, result.message, result.status);
+    return;
+  }
+
+  success(res, result.message, result.data, result.status);
+  return;
 };
 
+// LOGOUT ALL DEVICES
 export const logoutAllHandler = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   const result = await handleLogoutAll(req);
 
-  res.clearCookie("refreshToken", {
-    httpOnly: true,
-    secure: true,
-    sameSite: "strict",
-  });
+  clearAuthCookie(res, "refreshToken");
+  if (result.status !== 200) {
+    error(res, result.message, result.status);
+    return;
+  }
 
-  res.status(result.status).json({ message: result.message });
+  success(res, result.message, result.data, result.status);
+  return;
+};
+
+// GOOGLE OAUTH CALLBACK
+export const googleCallback = async (req: Request, res: Response) => {
+  const user = req.user as any;
+  const { accessToken, refreshToken } = issueTokensForUser(user);
+
+  // Set cookies
+  res;
+  setAuthCookie(res, "accessToken", accessToken);
+  setAuthCookie(res, "refreshToken", refreshToken);
+
+  // Consistent response
+  success(res, "Google login successful!", {
+    accessToken,
+    refreshToken,
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      provider: user.provider,
+    },
+  });
+  return;
+};
+
+// GITHUB OAUTH CALLBACK (same pattern)
+export const githubCallback = async (req: Request, res: Response) => {
+  const user = req.user as any;
+  const { accessToken, refreshToken } = issueTokensForUser(user);
+
+  setAuthCookie(res, "accessToken", accessToken);
+  setAuthCookie(res, "refreshToken", refreshToken);
+
+  success(res, "GitHub login successful!", {
+    accessToken,
+    refreshToken,
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      provider: user.provider,
+    },
+  });
+  return;
 };

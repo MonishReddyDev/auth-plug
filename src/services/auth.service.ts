@@ -3,9 +3,12 @@ import bcrypt from "bcryptjs";
 import prisma from "../config/prisma";
 import { generateOtp } from "../utils/otp.utils";
 import { hashToken } from "../utils/hash.util";
-import { sendOtpEmail } from "../utils/Email.utils";
+import { sendOtpEmail } from "../utils/email.utils";
 import jwt from "jsonwebtoken";
 import { generateAccessToken, generateRefreshToken } from "../utils/jwt.utils";
+import redis from "../config/redis";
+import { logError } from "../utils/logger.util";
+import { blacklistAccessToken } from "../utils/blacklist.utils";
 
 const REFRESH_SECRET = process.env.REFRESH_SECRET!;
 
@@ -16,10 +19,9 @@ export const handleUserRegistration = async (req: Request) => {
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
       return {
-        result: { status: 409, message: "User with this email already exists" },
-        accessToken: "",
-        refreshToken: "",
-        user: null,
+        status: 409,
+        message: "User with this email already exists",
+        data: {},
       };
     }
 
@@ -37,7 +39,11 @@ export const handleUserRegistration = async (req: Request) => {
       },
     });
 
-    await sendOtpEmail(email, otp);
+    try {
+      await sendOtpEmail(email, otp);
+    } catch (error) {
+      logError(error, req);
+    }
 
     const accessToken = generateAccessToken(newUser.id, newUser.role);
     const refreshToken = generateRefreshToken(newUser.id);
@@ -53,25 +59,24 @@ export const handleUserRegistration = async (req: Request) => {
     });
 
     return {
-      result: { status: 201, message: "User registered successfully" },
-      accessToken,
-      refreshToken,
-      user: {
-        id: newUser.id,
-        email: newUser.email,
-        role: newUser.role,
+      status: 201,
+      message: "User registered successfully",
+      data: {
+        user: {
+          id: newUser.id,
+          email: newUser.email,
+          role: newUser.role,
+        },
+        accessToken,
+        refreshToken,
       },
     };
   } catch (error) {
-    console.error("[Register Error]", error);
+    logError(error, req);
     return {
-      result: {
-        status: 500,
-        message: "Something went wrong while registering",
-      },
-      accessToken: "",
-      refreshToken: "",
-      user: null,
+      status: 500,
+      message: "Something went wrong while registering",
+      data: {},
     };
   }
 };
@@ -84,32 +89,26 @@ export const handleUserLogin = async (req: Request) => {
 
     if (!user) {
       return {
-        result: { status: 401, message: "Invalid email or password" },
-        accessToken: "",
-        refreshToken: "",
-        user: null,
+        status: 401,
+        message: "Invalid email or password",
+        data: {},
       };
     }
 
     if (!user.isVerified) {
       return {
-        result: {
-          status: 403,
-          message: "Email not verified. Please verify your email to log in.",
-        },
-        accessToken: "",
-        refreshToken: "",
-        user: null,
+        status: 403,
+        message: "Email not verified. Please verify your email to log in.",
+        data: {},
       };
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return {
-        result: { status: 401, message: "Invalid email or password" },
-        accessToken: "",
-        refreshToken: "",
-        user: null,
+        status: 401,
+        message: "Invalid email or password",
+        data: {},
       };
     }
 
@@ -127,22 +126,24 @@ export const handleUserLogin = async (req: Request) => {
     });
 
     return {
-      result: { status: 200, message: "Login successful" },
-      accessToken,
-      refreshToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
+      status: 200,
+      message: "Login successful",
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+        },
+        accessToken,
+        refreshToken,
       },
     };
   } catch (error) {
-    console.error("[Login Error]", error);
+    logError(error, req);
     return {
-      result: { status: 500, message: "Something went wrong while logging in" },
-      accessToken: "",
-      refreshToken: "",
-      user: null,
+      status: 500,
+      message: "Something went wrong while logging in",
+      data: {},
     };
   }
 };
@@ -150,13 +151,19 @@ export const handleUserLogin = async (req: Request) => {
 export const handleRefreshToken = async (req: Request) => {
   try {
     const token = req.cookies.refreshToken;
-    if (!token) return { status: 401, message: "Refresh token missing" };
+    if (!token)
+      return { status: 401, message: "Refresh token missing", data: {} };
 
     let decoded: { userId: string };
     try {
       decoded = jwt.verify(token, REFRESH_SECRET) as { userId: string };
-    } catch {
-      return { status: 401, message: "Invalid or expired refresh token" };
+    } catch (err) {
+      logError(err, req);
+      return {
+        status: 401,
+        message: "Invalid or expired refresh token",
+        data: {},
+      };
     }
 
     const storedToken = await prisma.refreshToken.findUnique({
@@ -167,13 +174,17 @@ export const handleRefreshToken = async (req: Request) => {
       !storedToken.isValid ||
       storedToken.expiresAt < new Date()
     ) {
-      return { status: 401, message: "Invalid or expired refresh token" };
+      return {
+        status: 401,
+        message: "Invalid or expired refresh token",
+        data: {},
+      };
     }
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
     });
-    if (!user) return { status: 404, message: "User not found" };
+    if (!user) return { status: 404, message: "User not found", data: {} };
 
     // Invalidate the old refresh token
     await prisma.refreshToken.update({
@@ -196,14 +207,18 @@ export const handleRefreshToken = async (req: Request) => {
 
     return {
       status: 200,
-      accessToken,
-      newRefreshToken,
+      message: "Token refreshed",
+      data: {
+        accessToken,
+        refreshToken: newRefreshToken,
+      },
     };
   } catch (err) {
-    console.error("[Refresh Error]", err);
+    logError(err, req);
     return {
-      status: 401,
+      status: 500,
       message: "Something went wrong during token refresh",
+      data: {},
     };
   }
 };
@@ -211,14 +226,24 @@ export const handleRefreshToken = async (req: Request) => {
 export const handleLogout = async (req: Request) => {
   try {
     const token = req.cookies.refreshToken;
-
     if (!token) {
       return {
         status: 200,
         message: "Logged out (no token found)",
+        data: {},
       };
     }
+    const accessToken =
+      req.cookies.accessToken ||
+      (req.headers.authorization &&
+      req.headers.authorization.startsWith("Bearer ")
+        ? req.headers.authorization.split(" ")[1]
+        : null);
 
+    // Use the helper for blacklisting
+    if (accessToken) {
+      await blacklistAccessToken(accessToken);
+    }
     await prisma.refreshToken.updateMany({
       where: { token, isValid: true },
       data: { isValid: false },
@@ -227,12 +252,14 @@ export const handleLogout = async (req: Request) => {
     return {
       status: 200,
       message: "Logged out successfully",
+      data: {},
     };
   } catch (error) {
-    console.error("[Logout Error]", error);
+    logError(error, req);
     return {
       status: 500,
       message: "Logout failed",
+      data: {},
     };
   }
 };
@@ -245,16 +272,19 @@ export const handleLogoutAll = async (req: Request) => {
       return {
         status: 200,
         message: "Logged out from all devices (no token found)",
+        data: {},
       };
     }
 
     let decoded: { userId: string };
     try {
       decoded = jwt.verify(token, REFRESH_SECRET) as { userId: string };
-    } catch {
+    } catch (err) {
+      logError(err, req);
       return {
         status: 401,
         message: "Invalid or expired token",
+        data: {},
       };
     }
 
@@ -266,12 +296,14 @@ export const handleLogoutAll = async (req: Request) => {
     return {
       status: 200,
       message: "Logged out from all devices successfully",
+      data: {},
     };
   } catch (error) {
-    console.error("[Logout-All Error]", error);
+    logError(error, req);
     return {
       status: 500,
       message: "Something went wrong while logging out from all devices",
+      data: {},
     };
   }
 };

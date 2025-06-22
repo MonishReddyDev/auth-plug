@@ -14,3 +14,10 @@ export const generateRefreshToken = (userId: string) => {
     expiresIn: "7d",
   });
 };
+
+// Accepts the user object, returns access and refresh tokens
+export function issueTokensForUser(user: any) {
+  const accessToken = generateAccessToken(user.id, user.role);
+  const refreshToken = generateRefreshToken(user.id);
+  return { accessToken, refreshToken };
+}

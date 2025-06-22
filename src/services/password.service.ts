@@ -3,7 +3,7 @@ import prisma from "../config/prisma";
 import { hashToken, verifyHashedToken } from "../utils/hash.util";
 import bcrypt from "bcryptjs";
 import { generateOtp } from "../utils/otp.utils";
-import { sendOtpEmail } from "../utils/Email.utils";
+import { sendOtpEmail } from "../utils/email.utils";
 
 export const handleForgotPassword = async (email: string) => {
   const user = await prisma.user.findUnique({ where: { email } });
@@ -24,8 +24,8 @@ export const handleForgotPassword = async (email: string) => {
       resetToken: hashedOTP,
       resetTokenExpiry: expiresAt,
     },
-  });
-
+  })
+  
   await sendOtpEmail(email, otp);
 
   return {
