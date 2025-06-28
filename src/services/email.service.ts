@@ -2,11 +2,13 @@ import prisma from "../config/prisma";
 import { generateOtp } from "../utils/otp.utils";
 import { hashToken } from "../utils/hash.util";
 import { sendOtpEmail } from "../utils/email.utils";
+import { logError } from "../utils/logger.util";
 
 export const resendOtpService = async (email: string) => {
   try {
     const user = await prisma.user.findUnique({ where: { email } });
 
+    // Always respond generically to prevent email enumeration
     if (!user) {
       return {
         status: 200,
@@ -18,7 +20,7 @@ export const resendOtpService = async (email: string) => {
       return { status: 400, message: "Email already verified" };
     }
 
-    const { otp: rawOtp } = generateOtp(6, 10); // 6-digit OTP, 10 min
+    const { otp: rawOtp } = generateOtp(6, 10); // 6-digit, 10 minutes
     const hashedOtp = hashToken(rawOtp);
 
     await prisma.user.update({
@@ -29,7 +31,7 @@ export const resendOtpService = async (email: string) => {
       },
     });
 
-    await sendOtpEmail(user.email, rawOtp);
+    sendOtpEmail(user.email, rawOtp).catch((err) => logError(err));
 
     return { status: 200, message: "OTP resent successfully" };
   } catch (err) {
@@ -46,13 +48,10 @@ export const verifyOtpService = async (email: string, otp: string) => {
       where: {
         email,
         verifyToken: hashedOTP,
-        verifyTokenExpiry: {
-          gte: new Date(),
-        },
+        verifyTokenExpiry: { gte: new Date() },
       },
     });
 
-    console.log(user);
     if (!user) {
       return { status: 400, message: "Invalid or expired OTP" };
     }

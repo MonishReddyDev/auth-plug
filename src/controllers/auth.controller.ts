@@ -26,13 +26,7 @@ export const registerUser = async (
 
   // Set refresh token as cookie if needed
   if (result.data.refreshToken) {
-    res.cookie("refreshToken", result.data.refreshToken, {
-      httpOnly: true, // JS can't access: prevents XSS
-      secure: process.env.NODE_ENV === "production", // Use true in production (HTTPS)
-      sameSite: "lax", // Strict is safest (Lax if you want, but strict is best for auth)
-      path: "/", // Applies to all routes
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
-    });
+    setAuthCookie(res, "refreshToken", result.data.refreshToken);
   }
 
   success(res, result.message, result.data, result.status);
@@ -51,8 +45,6 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
 
   if (result.data.refreshToken)
     setAuthCookie(res, "refreshToken", result.data.refreshToken);
-  // if (result.data.accessToken)
-  //   setAuthCookie(res, "accessToken", result.data.accessToken);
 
   success(res, result.message, result.data, result.status);
 };
@@ -69,9 +61,6 @@ export const refreshTokenHandler = async (
     return;
   }
 
-  if (result.data.accessToken) {
-    setAuthCookie(res, "accessToken", result.data.accessToken);
-  }
   if (result.data.refreshToken) {
     setAuthCookie(res, "refreshToken", result.data.refreshToken);
   }
@@ -87,7 +76,6 @@ export const logoutHandler = async (
 ): Promise<void> => {
   const result = await handleLogout(req);
 
-  clearAuthCookie(res, "accessToken");
   clearAuthCookie(res, "refreshToken");
 
   if (result.status !== 200) {

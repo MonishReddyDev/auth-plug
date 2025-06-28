@@ -13,10 +13,11 @@ import { blacklistAccessToken } from "../utils/blacklist.utils";
 const REFRESH_SECRET = process.env.REFRESH_SECRET!;
 
 export const handleUserRegistration = async (req: Request) => {
-  const { email, password, role } = req.body;
-
   try {
+    const { email, password, role } = req.body;
+
     const existingUser = await prisma.user.findUnique({ where: { email } });
+
     if (existingUser) {
       return {
         status: 409,
@@ -39,11 +40,8 @@ export const handleUserRegistration = async (req: Request) => {
       },
     });
 
-    try {
-      await sendOtpEmail(email, otp);
-    } catch (error) {
-      logError(error, req);
-    }
+    // Don't block registration on email failure, but consider logging
+    sendOtpEmail(email, otp).catch((err) => logError(err, req));
 
     const accessToken = generateAccessToken(newUser.id, newUser.role);
     const refreshToken = generateRefreshToken(newUser.id);
@@ -66,6 +64,7 @@ export const handleUserRegistration = async (req: Request) => {
           id: newUser.id,
           email: newUser.email,
           role: newUser.role,
+          isVerified: newUser.isVerified,
         },
         accessToken,
         refreshToken,
@@ -133,6 +132,7 @@ export const handleUserLogin = async (req: Request) => {
           id: user.id,
           email: user.email,
           role: user.role,
+          isVerified:user.isVerified
         },
         accessToken,
         refreshToken,

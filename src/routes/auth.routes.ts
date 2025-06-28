@@ -10,7 +10,6 @@ import {
 import { verifyOtpController } from "../controllers/email.controller";
 import { validateRequest } from "../middlewares/validateRequest.middleware";
 import { loginSchema, registerSchema } from "../validators/auth.validator";
-import { verifyToken } from "../middlewares/auth.middleware";
 import { resendOtpController } from "../controllers/email.controller";
 import {
   forgotPasswordController,
@@ -19,7 +18,9 @@ import {
 import passport from "../config/passport";
 import { googleCallback } from "../controllers/auth.controller";
 
+
 const router = express.Router();
+
 
 router.post("/register", validateRequest(registerSchema), registerUser);
 router.post("/login", validateRequest(loginSchema), loginUser);
@@ -38,6 +39,7 @@ router.get(
   "/google",
   passport.authenticate("google", { scope: ["profile", "email"] })
 );
+
 // Google redirects back here after user signs in
 router.get(
   "/google/callback",
