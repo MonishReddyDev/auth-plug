@@ -1,0 +1,402 @@
+openapi: 3.1.0
+info:
+  title: Auth API
+  version: "1.0"
+  description: Authentication and user management API
+
+servers:
+  - url: http://localhost:8000/api/auth
+
+paths:
+  /register:
+    post:
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+            example:
+              email: monishreddy9991@gmail.com
+              password: Secure@123
+              role: ADMIN
+      responses:
+        "200":
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterSuccessResponse"
+              example:
+                status: success
+                message: User registered successfully
+                data:
+                  user:
+                    id: d93c62b8-9889-477c-a76c-f9840a32a932
+                    email: monishreddy9991@gmail.com
+                    role: ADMIN
+                    isVerified: false
+                  accessToken: "<jwt-access>"
+                  refreshToken: "<jwt-refresh>"
+        "400":
+          description: Validation or registration error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /login:
+    post:
+      summary: User login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            example:
+              email: monishreddy9991@gmail.com
+              password: Secure@123
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginSuccessResponse"
+              example:
+                status: success
+                message: Login successful
+                data:
+                  user:
+                    id: d93c62b8-9889-477c-a76c-f9840a32a932
+                    email: monishreddy9991@gmail.com
+                    role: ADMIN
+                    isVerified: true
+                  accessToken: "<jwt-access>"
+                  refreshToken: "<jwt-refresh>"
+        "400":
+          description: Login error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /refresh:
+    post:
+      summary: Refresh JWT token
+      responses:
+        "200":
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenRefreshSuccessResponse"
+              example:
+                status: success
+                message: Token refreshed
+                data:
+                  accessToken: "<jwt-access>"
+                  refreshToken: "<jwt-refresh>"
+
+  /logout:
+    post:
+      summary: Logout current session
+      responses:
+        "200":
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericSuccessResponse"
+              example:
+                status: success
+                message: Logout successful
+                data: {}
+
+  /logoutAll:
+    post:
+      summary: Logout from all sessions
+      responses:
+        "200":
+          description: Logout from all sessions successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericSuccessResponse"
+              example:
+                status: success
+                message: Logout from all sessions successful
+                data: {}
+
+  /verify-otp:
+    post:
+      summary: Verify OTP (email)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OtpVerifyRequest"
+            example:
+              email: monishreddy9991@gmail.com
+              otp: "045727"
+      responses:
+        "200":
+          description: OTP verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericSuccessResponse"
+              example:
+                status: success
+                message: Email verified successfully
+                data: {}
+        "400":
+          description: Invalid OTP
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                status: error
+                message: Invalid OTP
+                data: {}
+
+  /resend-otp:
+    post:
+      summary: Resend OTP to email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OtpResendRequest"
+            example:
+              email: monishreddy900@gmail.com
+      responses:
+        "200":
+          description: OTP resent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericSuccessResponse"
+              example:
+                status: success
+                message: OTP resent successfully
+                data: {}
+        "400":
+          description: Email already verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                status: error
+                message: Email already verified
+                data: {}
+
+  /forgotPassword:
+    post:
+      summary: Request password reset OTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordRequest"
+            example:
+              email: monishreddy900@gmail.com
+      responses:
+        "200":
+          description: OTP sent if email exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericSuccessResponse"
+              example:
+                status: success
+                message: If the email is registered, an OTP has been sent.
+                data: {}
+
+  /resetPassword:
+    post:
+      summary: Reset password using OTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+            example:
+              email: monishreddy900@gmail.com
+              otp: "392918"
+              newPassword: 17612@Ec023@
+      responses:
+        "200":
+          description: Password reset successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericSuccessResponse"
+              example:
+                status: success
+                message: Password reset successful
+                data: {}
+        "400":
+          description: Invalid or expired OTP
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                status: error
+                message: Invalid or expired OTP
+                data: {}
+
+components:
+  schemas:
+    RegisterRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        role:
+          type: string
+      required: [email, password, role]
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required: [email, password]
+    OtpVerifyRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        otp:
+          type: string
+      required: [email, otp]
+    OtpResendRequest:
+      type: object
+      properties:
+        email:
+          type: string
+      required: [email]
+    ForgotPasswordRequest:
+      type: object
+      properties:
+        email:
+          type: string
+      required: [email]
+    ResetPasswordRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        otp:
+          type: string
+        newPassword:
+          type: string
+      required: [email, otp, newPassword]
+    RegisterSuccessResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            user:
+              type: object
+              properties:
+                id:
+                  type: string
+                email:
+                  type: string
+                role:
+                  type: string
+                isVerified:
+                  type: boolean
+            accessToken:
+              type: string
+            refreshToken:
+              type: string
+    LoginSuccessResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            user:
+              type: object
+              properties:
+                id:
+                  type: string
+                email:
+                  type: string
+                role:
+                  type: string
+                isVerified:
+                  type: boolean
+            accessToken:
+              type: string
+            refreshToken:
+              type: string
+    TokenRefreshSuccessResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            accessToken:
+              type: string
+            refreshToken:
+              type: string
+    GenericSuccessResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        data:
+          type: object
+    SuccessResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+        data:
+          type: object
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        message:
+          type: string
+        data:
+          type: object

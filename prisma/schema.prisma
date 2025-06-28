@@ -1,0 +1,70 @@
+
+generator client {
+  provider = "prisma-client-js"
+  // output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User{
+  id String @id @default(uuid())
+  
+  // Email Login
+  email String @unique
+  password String
+  name        String?
+  // Role-based access control 
+  role Role @default(USER)
+  
+  // Email verification
+  isVerified Boolean @default(false)
+  verifyToken String? // sent via email for verification
+  verifyTokenExpiry DateTime? // expiry time for that token
+
+  provider    String?   // e.g., "google"
+  providerId  String?   // Google profile ID 
+
+  // Password reset
+  resetToken String?
+  resetTokenExpiry DateTime?
+
+
+  // Session management / audit
+  lastLogin DateTime?  // updated at login
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  refreshTokens   RefreshToken[]
+}
+
+model RefreshToken{
+  id String @id @default(uuid()) //Prisma will auto generate the ID
+  // Secure token
+  token String @unique
+  
+  //RelationShip to User
+  userId String
+  user User @relation(fields: [userId],references: [id])
+
+//Device and session Tracking 
+  userAgent String?  // e.g., Chrome on Mac
+  ipAddress String?  // client IP at login
+  device String?     //e.g., iPhone 14, Samsung Galaxy
+
+  //Token Lifecycle
+  isValid Boolean @default(true)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+}
+
+enum Role {
+  USER
+  ADMIN
+}
