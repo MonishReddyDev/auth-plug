@@ -255,6 +255,38 @@ paths:
                 message: Invalid or expired OTP
                 data: {}
 
+  /github:
+    get:
+      summary: Start GitHub OAuth2 authentication
+      description: Redirects the user to GitHub for authentication.
+      responses:
+        "302":
+          description: Redirect to GitHub OAuth page
+
+  /github/callback:
+    get:
+      summary: GitHub OAuth2 callback
+      description: Handles the OAuth2 callback from GitHub, authenticates the user, and calls the githubCallback handler.
+      responses:
+        "302":
+          description: Redirect to frontend or login on failure
+
+  /google:
+    get:
+      summary: Start Google OAuth2 authentication
+      description: Redirects the user to Google for authentication and consent.
+      responses:
+        "302":
+          description: Redirect to Google OAuth consent screen
+
+  /google/callback:
+    get:
+      summary: Google OAuth2 callback
+      description: Handles the OAuth2 callback from Google, authenticates the user, and calls the googleCallback handler.
+      responses:
+        "302":
+          description: Redirect to frontend or login on failure
+
 components:
   schemas:
     RegisterRequest:
