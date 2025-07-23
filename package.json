@@ -36,7 +36,7 @@
     "ioredis": "^5.6.1",
     "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",
-    "morgan": "^1.10.0",
+    "morgan": "^1.10.1",
     "nodemailer": "^7.0.3",
     "passport": "^0.7.0",
     "passport-facebook": "^3.0.0",
